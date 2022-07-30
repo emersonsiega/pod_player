@@ -1,6 +1,6 @@
 part of 'pod_getx_video_controller.dart';
 
-class _PodVideoController extends _PodBaseController {
+class _PodVideoController extends _PodUiController {
   Timer? showOverlayTimer;
   Timer? showOverlayTimer1;
 
@@ -159,19 +159,23 @@ class _PodVideoController extends _PodBaseController {
     update(['update-all']);
   }
 
-  void enableFullScreen(String tag) {
+  Future<void> enableFullScreen(String tag) async {
     podLog('-full-screen-enable-entred');
     if (!isFullScreen) {
-      if (kIsWeb) {
-        SystemChrome.setPreferredOrientations(
-          [DeviceOrientation.landscapeRight],
-        );
+      if (onToggleFullScreen != null) {
+        await onToggleFullScreen!(true);
       } else {
-        SystemChrome.setPreferredOrientations(
-          [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight],
-        );
+        await Future.wait([
+          SystemChrome.setPreferredOrientations(
+            [
+              if (!kIsWeb) DeviceOrientation.landscapeLeft,
+              DeviceOrientation.landscapeRight,
+            ],
+          ),
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
+        ]);
       }
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
       _enableFullScreenView(tag);
       isFullScreen = true;
       WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
@@ -181,22 +185,29 @@ class _PodVideoController extends _PodBaseController {
     }
   }
 
-  void disableFullScreen(
+  Future<void> disableFullScreen(
     BuildContext context,
     String tag, {
     bool enablePop = true,
-  }) {
+  }) async {
     podLog('-full-screen-disable-entred');
     if (isFullScreen) {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown
-      ]); //for ios
-      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-      SystemChrome.setEnabledSystemUIMode(
-        SystemUiMode.manual,
-        overlays: SystemUiOverlay.values,
-      );
+      if (onToggleFullScreen != null) {
+        await onToggleFullScreen!(false);
+      } else {
+        await Future.wait([
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+          ]),
+          SystemChrome.setPreferredOrientations(DeviceOrientation.values),
+          SystemChrome.setEnabledSystemUIMode(
+            SystemUiMode.manual,
+            overlays: SystemUiOverlay.values,
+          ),
+        ]);
+      }
+
       if (enablePop) _exitFullScreenView(context, tag);
       isFullScreen = false;
       update(['full-screen']);
@@ -231,7 +242,7 @@ class _PodVideoController extends _PodBaseController {
     }
   }
 
-  ///claculates video `position` or `duration`
+  /// Calculates video `position` or `duration`
   String calculateVideoDuration(Duration _duration) {
     final _totalHour = _duration.inHours == 0 ? '' : '${_duration.inHours}:';
     final _totalMinute = _duration.toString().split(':')[1];
